@@ -561,7 +561,7 @@
       const fd = new FormData();
       fd.append('url', url);
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/scan/url', { method: 'POST', body: fd });
+        const res = await fetch('https://phishradar-lnh8.onrender.com/api/scan/url', { method: 'POST', body: fd });
         const data = await res.json();
         updatePill('risk-url', data.risk_score);
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
@@ -579,7 +579,7 @@
       const fd = new FormData();
       fd.append('content', content);
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/scan/text', { method: 'POST', body: fd });
+        const res = await fetch('https://phishradar-lnh8.onrender.com/api/scan/text', { method: 'POST', body: fd });
         const data = await res.json();
         updatePill('risk-text', data.risk_score);
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
@@ -597,7 +597,7 @@
       const fd = new FormData();
       fd.append('content', content);
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/scan/text', { method: 'POST', body: fd });
+        const res = await fetch('https://phishradar-lnh8.onrender.com/api/scan/text', { method: 'POST', body: fd });
         const data = await res.json();
         updatePill('risk-call', data.risk_score);
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">🚨 ${s}</div>`).join('');
@@ -615,7 +615,7 @@
       const fd = new FormData();
       fd.append('file', fileInput.files[0]);
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/scan/image', { method: 'POST', body: fd });
+        const res = await fetch('https://phishradar-lnh8.onrender.com/api/scan/image', { method: 'POST', body: fd });
         const data = await res.json();
         updatePill('risk-image', data.risk_score);
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
@@ -633,7 +633,7 @@
       const fd = new FormData();
       fd.append('file', fileInput.files[0]);
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/scan/video', { method: 'POST', body: fd });
+        const res = await fetch('https://phishradar-lnh8.onrender.com/api/scan/video', { method: 'POST', body: fd });
         const data = await res.json();
         updatePill('risk-video', data.risk_score);
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
