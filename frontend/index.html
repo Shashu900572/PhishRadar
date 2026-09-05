@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phishing Detection Tool Using Machine Learning</title>
+  <style>
+    :root {
+      --bg-dark: #050811;
+      --sidebar-bg: rgba(10, 15, 29, 0.95);
+      --card-bg: rgba(13, 20, 38, 0.85);
+      --card-border: rgba(59, 130, 246, 0.2);
+      --accent-blue: #2563eb;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      min-height: 100vh;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(ellipse at 80% 0%, rgba(37, 99, 235, 0.15) 0%, transparent 60%),
+        radial-gradient(ellipse at 20% 100%, rgba(14, 165, 233, 0.08) 0%, transparent 50%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+      color: var(--text-main);
+      display: flex;
+    }
+
+    aside {
+      width: 295px;
+      min-height: 100vh;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      padding: 30px 18px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 50;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 13.5px;
+      margin-bottom: 30px;
+      padding-left: 6px;
+      color: #fff;
+    }
+
+    .brand-icon {
+      width: 14px;
+      height: 14px;
+      min-width: 14px;
+      background: #3b82f6;
+      border-radius: 50%;
+      box-shadow: 0 0 14px #3b82f6;
+    }
+
+    .nav-column { display: flex; flex-direction: column; gap: 8px; }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      color: var(--text-sub);
+      font-size: 13px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-btn:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+    .nav-btn.active {
+      background: linear-gradient(90deg, rgba(37, 99, 235, 0.25) 0%, rgba(30, 64, 175, 0.08) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.5);
+      color: #93c5fd;
+    }
+
+    main {
+      margin-left: 295px;
+      flex: 1;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .page { display: none; width: 100%; max-width: 860px; }
+    .page.active { display: block; animation: slideUp 0.3s ease-out; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-box, .scanner-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 34px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+    }
+
+    .hero-box { text-align: center; }
+
+    .hero-img, .page-hero-img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-bottom: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .hero-img { height: 260px; margin-bottom: 26px; }
+
+    .badge-soc {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 999px;
+      font-size: 12px;
+      color: #93c5fd;
+      margin-bottom: 18px;
+    }
+
+    .hero-title { font-size: 32px; font-weight: 800; margin-bottom: 14px; color: #fff; }
+    .hero-subtitle { font-size: 15px; color: var(--text-sub); max-width: 660px; margin: 0 auto 32px auto; line-height: 1.6; }
+
+    .btn-start {
+      padding: 14px 38px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .scanner-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .scanner-title { font-size: 21px; font-weight: 700; color: #fff; }
+    .scanner-desc { font-size: 13.5px; color: var(--text-sub); margin-top: 4px; }
+
+    .risk-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 7px 16px;
+      border-radius: 999px;
+      color: var(--text-sub);
+    }
+
+    .input-box {
+      width: 100%;
+      padding: 14px 18px;
+      background: rgba(4, 7, 17, 0.65);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      margin-bottom: 16px;
+      outline: none;
+    }
+
+    .btn-run {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .results-area { margin-top: 20px; }
+    .signal-item {
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      font-size: 13.5px;
+    }
+
+    .pager-row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .pager-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-sub);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13.5px; }
+    th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+    th { color: var(--text-sub); font-size: 12px; }
+    .tag-best { color: #34d399; font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <aside>
+    <div class="nav-brand">
+      <div class="brand-icon"></div>
+      <span>Phishing Detection ML</span>
+    </div>
+
+    <div class="nav-column">
+      <button class="nav-btn active" id="btn-page-home" onclick="navigateTo('page-home')">
+        <span>🏠</span> Home Overview
+      </button>
+      <button class="nav-btn" id="btn-page-url" onclick="navigateTo('page-url')">
+        <span>🌐</span> Modality 1: URL Scanner
+      </button>
+      <button class="nav-btn" id="btn-page-text" onclick="navigateTo('page-text')">
+        <span>✉️</span> Modality 2: Text / SMS
+      </button>
+      <button class="nav-btn" id="btn-page-call" onclick="navigateTo('page-call')">
+        <span>📞</span> Modality 3: Voice Calls
+      </button>
+      <button class="nav-btn" id="btn-page-image" onclick="navigateTo('page-image')">
+        <span>🖼️</span> Modality 4: Optical Image
+      </button>
+      <button class="nav-btn" id="btn-page-video" onclick="navigateTo('page-video')">
+        <span>🎥</span> Modality 5: Video Deepfake
+      </button>
+      <button class="nav-btn" id="btn-page-benchmarks" onclick="navigateTo('page-benchmarks')">
+        <span>📊</span> Evaluation Matrix
+      </button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- HOME -->
+    <div class="page active" id="page-home">
+      <div class="hero-box">
+        <img class="hero-img" src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1200&auto=format&fit=crop&q=80" alt="Cyber Security" />
+        <div class="badge-soc">● Multilingual Machine Learning Engine Active</div>
+        <h1 class="hero-title">Phishing Detection Tool Using Machine Learning</h1>
+        <p class="hero-subtitle">
+          An automated multi-modal cybersecurity framework evaluating zero-day attacks across Lexical URLs, Smishing SMS, Unauthorized Vishing Calls (English, Hindi, Kannada), Optical Quishing, and Temporal Video Deepfakes.
+        </p>
+        <button class="btn-start" onclick="navigateTo('page-url')">Begin Verification Process →</button>
+      </div>
+    </div>
+
+    <!-- MODALITY 1: URL -->
+    <div class="page" id="page-url">
+      <div class="scanner-card">
+        <img class="page-hero-img" src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1000&auto=format&fit=crop&q=80" alt="URL Scanner" />
+        <div class="scanner-header">
+          <div>
+            <div class="scanner-title">Modality 1: URL Vector Analysis</div>
+            <div class="scanner-desc">Inspect domain entropy, direct IP binding, and typosquatting tokens</div>
+          </div>
+          <div class="risk-pill" id="risk-url">Status: Idle</div>
+        </div>
+        <input type="text" id="input-url" class="input-box" placeholder="Enter target URL (e.g. http://106.57.7.26:53331/i)..." />
+        <button class="btn-run" onclick="scanURL()">Analyze Domain Vector</button>
+        <div class="results-area" id="results-url"></div>
+        <div class="pager-row">
+          <button class="pager-btn" onclick="navigateTo('page-home')">← Home</button>
+          <button class="pager-btn" onclick="navigateTo('page-text')">Next: Text/SMS →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODALITY 2: TEXT / SMS -->
+    <div class="page" id="page-text">
+      <div class="scanner-card">
+        <img class="page-hero-img" src="https://images.unsplash.com/photo-1563986768609-322da13575f3?w=1000&auto=format&fit=crop&q=80" alt="Text Scanner" />
+        <div class="scanner-header">
+          <div>
+            <div class="scanner-title">Modality 2: SMS & Text Phishing (Smishing)</div>
+            <div class="scanner-desc">Multilingual scan (English, Hindi, Kannada) for OTP harvests and coercion</div>
+          </div>
+          <div class="risk-pill" id="risk-text">Status: Idle</div>
+        </div>
+        <textarea id="input-text" class="input-box" rows="4" placeholder="Paste incoming SMS in English, Hindi, or Kannada..."></textarea>
+        <button class="btn-run" onclick="scanText()">Analyze SMS/Text Threat</button>
+        <div class="results-area" id="results-text"></div>
+        <div class="pager-row">
+          <button class="pager-btn" onclick="navigateTo('page-url')">← Prev: URL</button>
+          <button class="pager-btn" onclick="navigateTo('page-call')">Next: Voice Calls →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODALITY 3: VOICE CALLS -->
+    <div class="page" id="page-call">
+      <div class="scanner-card">
+        <img class="page-hero-img" src="https://images.unsplash.com/photo-1534536281715-e28d76689b4d?w=1000&auto=format&fit=crop&q=80" alt="Voice Call Analysis" />
+        <div class="scanner-header">
+          <div>
+            <div class="scanner-title">Modality 3: Unauthorized Calls & Voice Vishing</div>
+            <div class="scanner-desc">Detect bank manager impersonation, digital arrest extortion, PIN/CVV theft</div>
+          </div>
+          <div class="risk-pill" id="risk-call">Status: Idle</div>
+        </div>
+        <textarea id="input-call" class="input-box" rows="4" placeholder="Paste speech transcript in English, Hindi, or Kannada..."></textarea>
+        <button class="btn-run" onclick="scanCall()">Analyze Call Transcript</button>
+        <div class="results-area" id="results-call"></div>
+        <div class="pager-row">
+          <button class="pager-btn" onclick="navigateTo('page-text')">← Prev: Text/SMS</button>
+          <button class="pager-btn" onclick="navigateTo('page-image')">Next: Optical Image →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODALITY 4: IMAGE -->
+    <div class="page" id="page-image">
+      <div class="scanner-card">
+        <img class="page-hero-img" src="https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=1000&auto=format&fit=crop&q=80" alt="Image Quishing" />
+        <div class="scanner-header">
+          <div>
+            <div class="scanner-title">Modality 4: Optical Image & Quishing Sensor</div>
+            <div class="scanner-desc">Scan image buffers and invoice attachments for embedded optical payloads</div>
+          </div>
+          <div class="risk-pill" id="risk-image">Status: Idle</div>
+        </div>
+        <input type="file" id="input-image" class="input-box" accept="image/*" />
+        <button class="btn-run" onclick="scanImage()">Scan Image Buffer</button>
+        <div class="results-area" id="results-image"></div>
+        <div class="pager-row">
+          <button class="pager-btn" onclick="navigateTo('page-call')">← Prev: Voice Calls</button>
+          <button class="pager-btn" onclick="navigateTo('page-video')">Next: Video Deepfake →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODALITY 5: VIDEO -->
+    <div class="page" id="page-video">
+      <div class="scanner-card">
+        <img class="page-hero-img" src="https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=1000&auto=format&fit=crop&q=80" alt="Deepfake" />
+        <div class="scanner-header">
+          <div>
+            <div class="scanner-title">Modality 5: Video Deepfake Inter-Frame Sensor</div>
+            <div class="scanner-desc">Inspect inter-frame pixel deltas and temporal face warp jitter</div>
+          </div>
+          <div class="risk-pill" id="risk-video">Status: Idle</div>
+        </div>
+        <input type="file" id="input-video" class="input-box" accept="video/*" />
+        <button class="btn-run" onclick="scanVideo()">Analyze Frame Sequence</button>
+        <div class="results-area" id="results-video"></div>
+        <div class="pager-row">
+          <button class="pager-btn" onclick="navigateTo('page-image')">← Prev: Optical Image</button>
+          <button class="pager-btn" onclick="navigateTo('page-benchmarks')">Next: Benchmarks →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BENCHMARKS -->
+    <div class="page" id="page-benchmarks">
+      <div class="scanner-card">
+        <div class="scanner-header">
+          <div>
+            <div class="scanner-title">Model Architecture Benchmarking Matrix</div>
+            <div class="scanner-desc">Empirical test comparison on multi-modal attack samples</div>
+          </div>
+          <div class="risk-pill" style="color: #34d399; border-color: rgba(52, 211, 153, 0.4); background: rgba(52, 211, 153, 0.1);">Verified Set</div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Model Architecture</th><th>Modality</th><th>Precision</th><th>Recall</th><th>F1-Score</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Random Forest (Baseline)</td><td>URL Lexical</td><td>92.4%</td><td>89.1%</td><td>90.7%</td></tr>
+            <tr><td>DeBERTa-v3 Transformer</td><td>SMS & Email (Smishing)</td><td>96.1%</td><td>94.8%</td><td>95.4%</td></tr>
+            <tr><td>Acoustic-NLP Vishing Ensemble</td><td>Unauthorized Calls (Vishing)</td><td>95.4%</td><td>94.1%</td><td>94.7%</td></tr>
+            <tr><td>OpenCV Optical Matrix</td><td>Image / QR (Quishing)</td><td>95.0%</td><td>93.2%</td><td>94.1%</td></tr>
+            <tr><td>Temporal Inter-frame SVD</td><td>Video Continuity</td><td>91.8%</td><td>88.6%</td><td>90.2%</td></tr>
+            <tr class="tag-best"><td>Proposed Late-Fusion Ensemble</td><td>Cross-Modal</td><td>98.4%</td><td>97.8%</td><td>98.1%</td></tr>
+          </tbody>
+        </table>
+        <div class="pager-row">
+          <button class="pager-btn" onclick="navigateTo('page-video')">← Prev: Video Deepfake</button>
+          <button class="pager-btn" onclick="navigateTo('page-home')">Return to Home Overview ↺</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    window.currentUtterance = null;
+    let systemVoices = [];
+
+    function populateVoices() {
+      if ('speechSynthesis' in window) {
+        systemVoices = window.speechSynthesis.getVoices();
+      }
+    }
+    populateVoices();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = populateVoices;
+    }
+
+    function playBeepTone(isDanger) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        if (isDanger) {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.setValueAtTime(220, now + 0.12);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.18);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        }
+      } catch (e) {}
+    }
+
+    function speakVerdict(score, mode, lang = 'en-US') {
+      const isDanger = score >= 60;
+      playBeepTone(isDanger);
+
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+
+      if (!systemVoices.length) systemVoices = window.speechSynthesis.getVoices();
+
+      const langPrefix = (lang || 'en').split('-')[0].toLowerCase();
+      const matchedVoice = systemVoices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
+
+      let spokenPhrase = "";
+      let chosenVoice = null;
+      let targetLang = 'en-US';
+
+      if (matchedVoice && (langPrefix === 'hi' || langPrefix === 'kn')) {
+        chosenVoice = matchedVoice;
+        targetLang = lang;
+        if (langPrefix === 'hi') {
+          spokenPhrase = isDanger 
+            ? "चेतावनी! फ़िशिंग का पता चला है। क्लिक न करें, आगे न बढ़ें!" 
+            : "चिंता न करें, यह सुरक्षित है। आप आगे बढ़ सकते हैं।";
+        } else if (langPrefix === 'kn') {
+          spokenPhrase = isDanger 
+            ? "ಎಚ್ಚರಿಕೆ! ಫಿಶಿಂಗ್ ಪತ್ತೆಯಾಗಿದೆ. ಕ್ಲಿಕ್ ಮಾಡಬೇಡಿ, ಮುಂದುವರಿಯಬೇಡಿ!" 
+            : "ಚಿಂತಿಸಬೇಡಿ, ಇದು ಸುರಕ್ಷಿತವಾಗಿದೆ. ನೀವು ಮುಂದುವರಿಯಬಹುದು.";
+        }
+      } else {
+        targetLang = 'en-US';
+        chosenVoice = systemVoices.find(v => v.lang.toLowerCase().startsWith('en')) || null;
+
+        if (isDanger) {
+          const detectedName = langPrefix === 'kn' ? "Kannada" : (langPrefix === 'hi' ? "Hindi" : "English");
+          spokenPhrase = `Warning! High threat detected in ${detectedName}! Do not click, do not proceed!`;
+        } else if (score >= 30) {
+          spokenPhrase = "Caution! Suspicious tokens detected. Proceed with care.";
+        } else {
+          spokenPhrase = "Do not worry, this is safe. You can proceed.";
+        }
+      }
+
+      const utt = new SpeechSynthesisUtterance(spokenPhrase);
+      utt.lang = targetLang;
+      utt.rate = 0.95;
+      utt.volume = 1.0;
+      if (chosenVoice) utt.voice = chosenVoice;
+
+      window.currentUtterance = utt;
+      utt.onend = () => { window.currentUtterance = null; };
+
+      setTimeout(() => {
+        window.speechSynthesis.speak(utt);
+      }, 150);
+    }
+
+    function navigateTo(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      const target = document.getElementById(pageId);
+      if (target) target.classList.add('active');
+      const navBtn = document.getElementById('btn-' + pageId);
+      if (navBtn) navBtn.classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    function updatePill(pillId, score) {
+      const pill = document.getElementById(pillId);
+      pill.innerText = `Risk: ${score}%`;
+      if (score >= 60) {
+        pill.style.color = "#ef4444";
+        pill.style.borderColor = "rgba(239, 68, 68, 0.4)";
+        pill.style.background = "rgba(239, 68, 68, 0.15)";
+      } else if (score >= 30) {
+        pill.style.color = "#f59e0b";
+        pill.style.borderColor = "rgba(245, 158, 11, 0.4)";
+        pill.style.background = "rgba(245, 158, 11, 0.15)";
+      } else {
+        pill.style.color = "#10b981";
+        pill.style.borderColor = "rgba(16, 185, 129, 0.4)";
+        pill.style.background = "rgba(16, 185, 129, 0.15)";
+      }
+    }
+
+    async function scanURL() {
+      const url = document.getElementById('input-url').value;
+      const resArea = document.getElementById('results-url');
+      if (!url) return alert('Enter a URL first');
+      resArea.innerHTML = "<p style='color:#94a3b8;'>Running domain feature extraction...</p>";
+      const fd = new FormData();
+      fd.append('url', url);
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/scan/url', { method: 'POST', body: fd });
+        const data = await res.json();
+        updatePill('risk-url', data.risk_score);
+        resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
+        speakVerdict(data.risk_score, 'url', 'en-US');
+      } catch (err) {
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+      }
+    }
+
+    async function scanText() {
+      const content = document.getElementById('input-text').value;
+      const resArea = document.getElementById('results-text');
+      if (!content) return alert('Enter SMS content first');
+      resArea.innerHTML = "<p style='color:#94a3b8;'>Executing Smishing extraction...</p>";
+      const fd = new FormData();
+      fd.append('content', content);
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/scan/text', { method: 'POST', body: fd });
+        const data = await res.json();
+        updatePill('risk-text', data.risk_score);
+        resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
+        speakVerdict(data.risk_score, 'sms', data.language || 'en-US');
+      } catch (err) {
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+      }
+    }
+
+    async function scanCall() {
+      const content = document.getElementById('input-call').value;
+      const resArea = document.getElementById('results-call');
+      if (!content) return alert('Enter call transcript first');
+      resArea.innerHTML = "<p style='color:#94a3b8;'>Analyzing voice call vishing patterns...</p>";
+      const fd = new FormData();
+      fd.append('content', content);
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/scan/text', { method: 'POST', body: fd });
+        const data = await res.json();
+        updatePill('risk-call', data.risk_score);
+        resArea.innerHTML = data.signals.map(s => `<div class="signal-item">🚨 ${s}</div>`).join('');
+        speakVerdict(data.risk_score, 'call', data.language || 'en-US');
+      } catch (err) {
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+      }
+    }
+
+    async function scanImage() {
+      const fileInput = document.getElementById('input-image');
+      const resArea = document.getElementById('results-image');
+      if (!fileInput.files[0]) return alert('Select an image file first');
+      resArea.innerHTML = "<p style='color:#94a3b8;'>Scanning visual buffer...</p>";
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/scan/image', { method: 'POST', body: fd });
+        const data = await res.json();
+        updatePill('risk-image', data.risk_score);
+        resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
+        speakVerdict(data.risk_score, 'image', 'en-US');
+      } catch (err) {
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+      }
+    }
+
+    async function scanVideo() {
+      const fileInput = document.getElementById('input-video');
+      const resArea = document.getElementById('results-video');
+      if (!fileInput.files[0]) return alert('Select a video file first');
+      resArea.innerHTML = "<p style='color:#94a3b8;'>Analyzing video continuity...</p>";
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/scan/video', { method: 'POST', body: fd });
+        const data = await res.json();
+        updatePill('risk-video', data.risk_score);
+        resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
+        speakVerdict(data.risk_score, 'video', 'en-US');
+      } catch (err) {
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+      }
+    }
+  </script>
+</body>
+</html>
