@@ -203,6 +203,61 @@
       cursor: pointer;
     }
 
+    /* Voice / Microphone Bar Controls */
+    .mic-control-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-mic {
+      flex: 1;
+      padding: 12px 18px;
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+      font-size: 13.5px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-mic.recording {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      color: #fca5a5;
+      animation: pulseRecord 1.5s infinite;
+    }
+
+    @keyframes pulseRecord {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .lang-select {
+      background: rgba(4, 7, 17, 0.65);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #f8fafc;
+      padding: 11px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .lang-select option {
+      background: #0d1426;
+      color: #fff;
+    }
+
     .results-area { margin-top: 20px; }
     .signal-item {
       background: rgba(255, 255, 255, 0.025);
@@ -235,6 +290,14 @@
     th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
     th { color: var(--text-sub); font-size: 12px; }
     .tag-best { color: #34d399; font-weight: 700; }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      aside { position: relative; width: 100%; min-height: auto; padding: 18px; }
+      main { margin-left: 0; padding: 20px 14px; min-height: auto; }
+      .hero-title { font-size: 24px; }
+      .hero-img { height: 180px; }
+    }
   </style>
 </head>
 <body>
@@ -333,11 +396,24 @@
         <div class="scanner-header">
           <div>
             <div class="scanner-title">Modality 3: Unauthorized Calls & Voice Vishing</div>
-            <div class="scanner-desc">Detect bank manager impersonation, digital arrest extortion, PIN/CVV theft</div>
+            <div class="scanner-desc">Record call audio or speech transcript in English, Hindi, or Kannada</div>
           </div>
           <div class="risk-pill" id="risk-call">Status: Idle</div>
         </div>
-        <textarea id="input-call" class="input-box" rows="4" placeholder="Paste speech transcript in English, Hindi, or Kannada..."></textarea>
+
+        <!-- Microphone / Speech-to-Text Bar -->
+        <div class="mic-control-bar">
+          <button class="btn-mic" id="mic-btn" type="button" onclick="toggleVoiceRecognition()">
+            <span id="mic-icon">🎙️</span> <span id="mic-status">Start Call Audio Recording</span>
+          </button>
+          <select id="voice-lang-select" class="lang-select">
+            <option value="en-US">English (IN/US)</option>
+            <option value="hi-IN">Hindi (हिंदी)</option>
+            <option value="kn-IN">Kannada (ಕನ್ನಡ)</option>
+          </select>
+        </div>
+
+        <textarea id="input-call" class="input-box" rows="4" placeholder="Click 'Start Call Audio Recording' to speak, or paste a transcript..."></textarea>
         <button class="btn-run" onclick="scanCall()">Analyze Call Transcript</button>
         <div class="results-area" id="results-call"></div>
         <div class="pager-row">
@@ -423,6 +499,79 @@
   <script>
     window.currentUtterance = null;
     let systemVoices = [];
+    let recognition = null;
+    let isRecording = false;
+
+    function initSpeechRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return null;
+      const recog = new SpeechRecognition();
+      recog.continuous = false;
+      recog.interimResults = false;
+
+      recog.onstart = () => {
+        isRecording = true;
+        const btn = document.getElementById('mic-btn');
+        const icon = document.getElementById('mic-icon');
+        const status = document.getElementById('mic-status');
+        btn.classList.add('recording');
+        icon.innerText = '🔴';
+        status.innerText = 'Listening to Call Audio... Speak now';
+      };
+
+      recog.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        const inputArea = document.getElementById('input-call');
+        inputArea.value = (inputArea.value ? inputArea.value + ' ' : '') + transcript;
+      };
+
+      recog.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
+        stopVoiceRecognition();
+      };
+
+      recog.onend = () => {
+        stopVoiceRecognition();
+      };
+
+      return recog;
+    }
+
+    function toggleVoiceRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Voice speech recognition is not supported in this browser. Please use Chrome or Edge.');
+        return;
+      }
+
+      if (!recognition) {
+        recognition = initSpeechRecognition();
+      }
+
+      if (isRecording) {
+        recognition.stop();
+        stopVoiceRecognition();
+      } else {
+        const selectedLang = document.getElementById('voice-lang-select').value;
+        recognition.lang = selectedLang;
+        try {
+          recognition.start();
+        } catch (e) {
+          recognition.stop();
+          stopVoiceRecognition();
+        }
+      }
+    }
+
+    function stopVoiceRecognition() {
+      isRecording = false;
+      const btn = document.getElementById('mic-btn');
+      const icon = document.getElementById('mic-icon');
+      const status = document.getElementById('mic-status');
+      if (btn) btn.classList.remove('recording');
+      if (icon) icon.innerText = '🎙️';
+      if (status) status.innerText = 'Start Call Audio Recording';
+    }
 
     function populateVoices() {
       if ('speechSynthesis' in window) {
@@ -567,7 +716,7 @@
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
         speakVerdict(data.risk_score, 'url', 'en-US');
       } catch (err) {
-        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Server connecting or starting up. Try again in 30 seconds.</div>`;
       }
     }
 
@@ -585,14 +734,14 @@
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
         speakVerdict(data.risk_score, 'sms', data.language || 'en-US');
       } catch (err) {
-        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Server connecting or starting up. Try again in 30 seconds.</div>`;
       }
     }
 
     async function scanCall() {
       const content = document.getElementById('input-call').value;
       const resArea = document.getElementById('results-call');
-      if (!content) return alert('Enter call transcript first');
+      if (!content) return alert('Record audio or enter call transcript first');
       resArea.innerHTML = "<p style='color:#94a3b8;'>Analyzing voice call vishing patterns...</p>";
       const fd = new FormData();
       fd.append('content', content);
@@ -603,7 +752,7 @@
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">🚨 ${s}</div>`).join('');
         speakVerdict(data.risk_score, 'call', data.language || 'en-US');
       } catch (err) {
-        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Server connecting or starting up. Try again in 30 seconds.</div>`;
       }
     }
 
@@ -621,7 +770,7 @@
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
         speakVerdict(data.risk_score, 'image', 'en-US');
       } catch (err) {
-        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Server connecting or starting up. Try again in 30 seconds.</div>`;
       }
     }
 
@@ -639,7 +788,7 @@
         resArea.innerHTML = data.signals.map(s => `<div class="signal-item">⚠️ ${s}</div>`).join('');
         speakVerdict(data.risk_score, 'video', 'en-US');
       } catch (err) {
-        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Backend connection error on port 8000</div>`;
+        resArea.innerHTML = `<div class="signal-item" style="color:#ef4444;">Server connecting or starting up. Try again in 30 seconds.</div>`;
       }
     }
   </script>

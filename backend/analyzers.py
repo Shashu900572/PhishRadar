@@ -7,6 +7,25 @@ from PIL import Image
 
 # ----------------- 1. URL ANALYZER -----------------
 class URLAnalyzer:
+    # Top verified genuine domains that should never trigger false positives
+    LEGIT_DOMAINS = {
+        "instagram.com", "facebook.com", "whatsapp.com", "meta.com",
+        "google.com", "youtube.com", "gmail.com",
+        "apple.com", "microsoft.com", "live.com", "linkedin.com",
+        "twitter.com", "x.com", "github.com", "amazon.com", "amazon.in",
+        "netflix.com", "flipkart.com", "zerodha.com", "kite.zerodha.com",
+        "sbi.co.in", "onlinesbi.sbi", "hdfcbank.com", "icicibank.com",
+        "axisbank.com", "paytm.com", "phonepe.com"
+    }
+
+    @classmethod
+    def is_whitelisted(cls, domain: str) -> bool:
+        domain = domain.lower()
+        for legit in cls.LEGIT_DOMAINS:
+            if domain == legit or domain.endswith("." + legit):
+                return True
+        return False
+
     @staticmethod
     def calculate_entropy(text: str) -> float:
         if not text:
@@ -23,30 +42,43 @@ class URLAnalyzer:
             clean_url = f"http://{clean_url}"
 
         parsed = urlparse(clean_url)
-        domain = parsed.hostname or parsed.netloc.split(":")[0].lower()
+        domain = (parsed.hostname or parsed.netloc.split(":")[0]).lower()
         port = parsed.port
+
+        # 1. Immediate Whitelist Evaluation (Prevents false positives on Instagram, Google, etc.)
+        if cls.is_whitelisted(domain):
+            return {
+                "risk_score": 0.0,
+                "verdict": "Safe",
+                "signals": [f"Verified authentic root domain: {domain}"]
+            }
 
         signals = []
         score = 0.0
 
+        # Direct IP heuristic
         if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", domain):
             score += 0.70
             signals.append(f"Direct IP address ({domain}) used instead of legitimate hostname")
 
+        # Non-standard Web Port
         if port and port not in [80, 443]:
             score += 0.20
             signals.append(f"Suspicious high-risk port detected: :{port}")
 
-        if any(brand in domain for brand in ["zerodha", "kite", "bank", "secure", "login"]):
-            if domain not in ["kite.zerodha.com", "zerodha.com"]:
-                score += 0.45
-                signals.append("High-Value Brand/Fintech Impersonation token detected")
+        # Brand Impersonation / Typosquatting Check
+        impersonation_targets = ["zerodha", "kite", "bank", "secure", "login", "instagram", "facebook", "sbi", "paytm"]
+        if any(brand in domain for brand in impersonation_targets):
+            score += 0.45
+            signals.append("High-Value Brand/Fintech Impersonation token detected")
 
+        # Domain Entropy Check (Calculated strictly on the root domain, not paths/parameters)
         entropy = cls.calculate_entropy(domain)
         if entropy > 3.8:
             score += 0.20
             signals.append(f"High domain randomness (Entropy: {entropy:.2f})")
 
+        # Excessive Subdomains Check
         if not re.match(r"^\d{1,3}(\.\d{1,3}){3}$", domain) and domain.count(".") >= 3:
             score += 0.15
             signals.append(f"Excessive subdomain depth ({domain.count('.')} dots)")
@@ -72,7 +104,8 @@ class TextAnalyzer:
     
     CALL_PATTERNS = [
         "calling from bank", "credit card department", "customs department",
-        "digital arrest", "cbi officer", "confirm your pin", "cvv number", "card expiry"
+        "digital arrest", "cbi officer", "confirm your pin", "cvv number", "card expiry",
+        "provide your otp"
     ]
 
     @classmethod
