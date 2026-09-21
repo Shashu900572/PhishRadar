@@ -15,7 +15,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Verified root domains that are 100% legitimate
 LEGIT_DOMAINS = {
     "instagram.com", "facebook.com", "whatsapp.com", "meta.com",
     "google.com", "youtube.com", "gmail.com",
@@ -98,9 +97,9 @@ async def scan_url(url: str = Form(...)):
 
     parsed = urlparse(clean_url)
     raw_host = (parsed.hostname or parsed.netloc.split(":")[0]).lower()
+    path = parsed.path.lower()
     port = parsed.port
 
-    # 1. Whitelist Check (Instant Safe)
     if is_whitelisted(raw_host):
         return {
             "risk_score": 0.0,
@@ -110,12 +109,10 @@ async def scan_url(url: str = Form(...)):
     score = 5
     signals = []
 
-    # 2. Suspicious TLD check
     if any(raw_host.endswith(tld) for tld in SUSPICIOUS_TLDS):
         score += 35
         signals.append("High-risk / free-tier domain extension (commonly abused TLD)")
 
-    # 3. Brand Impersonation / Subdomain deceptive nesting
     impersonation_targets = [
         "zerodha", "kite", "bank", "secure", "login", "instagram", "facebook",
         "sbi", "paytm", "upi", "hdfc", "icici", "kyc", "verify", "support", "bill",
@@ -126,28 +123,37 @@ async def scan_url(url: str = Form(...)):
         score += 45
         signals.append(f"High-Value Brand/Fintech Impersonation token: {', '.join(matched_brands[:3])}")
 
-    # 4. Excessive Subdomain / Nesting deceptive trick
+    path_keywords = ["validation", "verification", "confirm", "auth", "signin", "update-account", "webscr", "login"]
+    matched_path_kw = [pk for pk in path_keywords if pk in path]
+    if matched_path_kw:
+        score += 40
+        signals.append(f"Deceptive credential validation path detected: /{matched_path_kw[0]}")
+
+    if re.search(r'[a-f0-9]{24,}', path):
+        score += 45
+        signals.append("Obfuscated automated phishing kit token/hash located in URI path")
+
+    if len(clean_url) > 60:
+        score += 15
+        signals.append(f"Abnormal URI length ({len(clean_url)} chars) common in phishing redirects")
+
     if raw_host.count(".") >= 3:
         score += 20
         signals.append(f"Deceptive subdomain nesting depth ({raw_host.count('.')} dots)")
 
-    # 5. Direct IP routing
     if re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', raw_host):
         score += 40
         signals.append("Direct bare IPv4 address routing detected (evading DNS inspection)")
 
-    # 6. High Entropy (DGA randomly generated domains)
     entropy = calculate_entropy(raw_host)
     if entropy > 3.8:
         score += 20
         signals.append(f"High domain randomness / algorithmic generation (Entropy: {entropy})")
 
-    # 7. Suspicious Ports
     if port and port not in [80, 443]:
         score += 25
         signals.append(f"Suspicious high-risk port detected: :{port}")
 
-    # 8. Deceptive Hyphen Chaining (e.g. sbi-online-banking-update.com)
     if raw_host.count("-") >= 2:
         score += 15
         signals.append("Multiple hyphen separators typical of phishing typosquatting")
@@ -179,7 +185,6 @@ async def scan_text(content: str = Form(...)):
         score += 15
         signals.append(f"Targeted asset/account context: {', '.join(found_account[:3])}")
 
-    # Check for embedded links/URLs in SMS
     detected_urls = re.findall(r'(?:https?:\/\/|www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?', content)
     suspicious_links = []
     for raw_u in detected_urls:
@@ -191,12 +196,10 @@ async def scan_text(content: str = Form(...)):
         score += 35
         signals.append(f"Unverified redirect link detected in SMS: {', '.join(suspicious_links[:2])}")
 
-    # Check for raw mobile numbers in scam SMS (calling scammer pretending to be support)
     if re.search(r'\b(?:\+91|0)?[6-9]\d{9}\b', content) and (found_urgency or found_creds):
         score += 20
         signals.append("Direct unverified contact number embedded with urgent call-to-action")
 
-    # Check for malicious APK mentions
     if ".apk" in text_lower or "download app" in text_lower:
         score += 35
         signals.append("External unauthorized Android application (.apk) installation prompt")
