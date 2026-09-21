@@ -97,7 +97,7 @@ async def scan_url(url: str = Form(...)):
 
     parsed = urlparse(clean_url)
     raw_host = (parsed.hostname or parsed.netloc.split(":")[0]).lower()
-    path = parsed.path.lower()
+    full_path = (parsed.path + ("?" + parsed.query if parsed.query else "")).lower()
     port = parsed.port
 
     # Whitelist Check
@@ -119,32 +119,32 @@ async def scan_url(url: str = Form(...)):
     impersonation_targets = [
         "zerodha", "kite", "bank", "secure", "login", "instagram", "facebook",
         "sbi", "paytm", "upi", "hdfc", "icici", "kyc", "verify", "support", "bill",
-        "amazon", "google", "apple", "netflix", "flipkart", "post", "tax"
+        "amazon", "google", "apple", "netflix", "flipkart", "post", "tax", "poste"
     ]
-    matched_brands = [b for b in impersonation_targets if b in raw_host]
+    matched_brands = [b for b in impersonation_targets if b in raw_host or b in full_path]
     if matched_brands:
         score += 45
-        signals.append(f"High-Value Brand/Fintech Impersonation token: {', '.join(matched_brands[:3])}")
+        signals.append(f"High-Value Brand/Fintech Impersonation target: {', '.join(matched_brands[:3])}")
 
-    # Fake TLD Suffix Trick (e.g. .com-app or .com-login)
+    # Fake TLD Suffix Trick
     if re.search(r'\.(com|co|net|org|gov)-', raw_host):
         score += 40
         signals.append("Deceptive TLD hyphenation trick (impersonating legitimate root domain)")
 
-    # Subdomain brand spoofing (e.g. appleid.apple.com-app.es)
+    # Subdomain brand spoofing
     parts = raw_host.split(".")
     if len(parts) >= 3 and any(b in ".".join(parts[:-2]) for b in impersonation_targets):
         score += 35
         signals.append("Subdomain brand injection: Legitimate organization impersonated on foreign host")
 
-    # Deep URL Path Phishing Vectors
-    path_keywords = ["validation", "verification", "confirm", "auth", "signin", "update-account", "webscr", "login"]
-    matched_path_kw = [pk for pk in path_keywords if pk in path]
+    # Deep URL Path & Query Phishing Vectors
+    path_keywords = ["validation", "verification", "confirm", "auth", "signin", "update-account", "webscr", "login", "logon"]
+    matched_path_kw = [pk for pk in path_keywords if pk in full_path]
     if matched_path_kw:
-        score += 40
-        signals.append(f"Deceptive credential validation path detected: /{matched_path_kw[0]}")
+        score += 45
+        signals.append(f"Deceptive authentication/credential harvesting parameter: {matched_path_kw[0]}")
 
-    if re.search(r'[a-f0-9]{24,}', path):
+    if re.search(r'[a-f0-9]{24,}', full_path):
         score += 45
         signals.append("Obfuscated automated phishing kit token/hash located in URI path")
 
@@ -169,7 +169,7 @@ async def scan_url(url: str = Form(...)):
         score += 25
         signals.append(f"Suspicious high-risk port detected: :{port}")
 
-    if raw_host.count("-") >= 2 or ("-" in raw_host and matched_brands):
+    if raw_host.count("-") >= 2 or ("-" in raw_host and any(b in raw_host for b in impersonation_targets)):
         score += 20
         signals.append("Typosquatting hyphen separator paired with brand name")
 
