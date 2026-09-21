@@ -15,7 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Verified root domains that are 100% legitimate
+# High-authority domains that are clean
 LEGIT_DOMAINS = {
     "instagram.com", "facebook.com", "whatsapp.com", "meta.com",
     "google.com", "youtube.com", "gmail.com",
@@ -25,7 +25,22 @@ LEGIT_DOMAINS = {
     "sbi.co.in", "onlinesbi.sbi", "hdfcbank.com", "icicibank.com",
     "axisbank.com", "paytm.com", "phonepe.com", "incometax.gov.in",
     "indiapost.gov.in", "irctc.co.in", "uidai.gov.in", "epfindia.gov.in",
-    "onrender.com"
+    "onrender.com", "wikipedia.org", "wikimedia.org", "wiktionary.org",
+    "wikibooks.org", "stackoverflow.com", "stackexchange.com",
+    "w3schools.com", "coursera.org", "nih.gov", "cdc.gov"
+}
+
+# Free cloud tiers commonly abused to host phishing kits
+FREE_HOSTING_PROVIDERS = {
+    "appspot.com", "firebaseapp.com", "web.app", "000webhostapp.com",
+    "codesandbox.io", "yolasite.com", "webcindario.com", "site44.com",
+    "netlify.app", "vercel.app", "glitch.me", "typeform.com", "myfreesites.net"
+}
+
+# Known URL shortener services that obscure final destinations
+SHORTENERS = {
+    "bit.ly", "bit.do", "cutt.ly", "tny.im", "3.ly", "cli.re",
+    "u.to", "owl.li", "ht.ly", "rebrand.ly", "tinyurl.com"
 }
 
 SUSPICIOUS_TLDS = {
@@ -102,7 +117,7 @@ async def scan_url(url: str = Form(...)):
     full_path = (parsed.path + ("?" + parsed.query if parsed.query else "")).lower()
     port = parsed.port
 
-    # Whitelist Check (Instant 0% Safe)
+    # Whitelist Check
     if is_whitelisted(raw_host):
         return {
             "risk_score": 0.0,
@@ -112,35 +127,56 @@ async def scan_url(url: str = Form(...)):
     score = 5
     signals = []
 
-    # Suspicious TLD check
+    # 1. URL Shortener Detection
+    for sh in SHORTENERS:
+        if raw_host == sh or raw_host.endswith("." + sh):
+            score += 55
+            signals.append(f"Obfuscated destination: URL Shortener detected ({raw_host})")
+            break
+
+    # 2. Suspicious TLD Detection
     if any(raw_host.endswith(tld) for tld in SUSPICIOUS_TLDS):
         score += 35
         signals.append("High-risk / free-tier domain extension (commonly abused TLD)")
 
-    # Brand Impersonation targets
+    # 3. Brand Impersonation Targets
     impersonation_targets = [
         "zerodha", "kite", "bank", "secure", "login", "instagram", "facebook",
         "sbi", "paytm", "upi", "hdfc", "icici", "kyc", "verify", "support", "bill",
-        "amazon", "google", "apple", "netflix", "flipkart", "post", "tax", "poste"
+        "amazon", "google", "apple", "netflix", "flipkart", "post", "tax", "poste",
+        "chase", "paypal", "docusign", "dropbox", "onedrive", "office365", "wellsfargo"
     ]
-    matched_brands = [b for b in impersonation_targets if b in raw_host or b in full_path]
-    if matched_brands:
+    matched_host_brands = [b for b in impersonation_targets if b in raw_host]
+    if matched_host_brands:
         score += 45
-        signals.append(f"High-Value Brand/Fintech Impersonation target: {', '.join(matched_brands[:3])}")
+        signals.append(f"High-Value Brand/Fintech Impersonation target in host: {', '.join(matched_host_brands[:3])}")
 
-    # Fake TLD Suffix Trick (e.g. .com-app)
+    matched_path_brands = [b for b in impersonation_targets if b in full_path]
+    if matched_path_brands and not matched_host_brands:
+        score += 35
+        signals.append(f"Brand impersonation keyword located in URI path: {', '.join(matched_path_brands[:3])}")
+
+    # 4. Abused Free Hosting Platforms
+    if any(raw_host.endswith(fh) for fh in FREE_HOSTING_PROVIDERS):
+        score += 45
+        signals.append("Hosted on public free-tier / developer cloud domain commonly abused for credential theft")
+
+    # 5. Fake TLD Suffix Trick (e.g. .com-app)
     if re.search(r'\.(com|co|net|org|gov)-', raw_host):
         score += 40
         signals.append("Deceptive TLD hyphenation trick (impersonating legitimate root domain)")
 
-    # Subdomain brand spoofing
+    # 6. Subdomain brand spoofing
     parts = raw_host.split(".")
     if len(parts) >= 3 and any(b in ".".join(parts[:-2]) for b in impersonation_targets):
         score += 35
         signals.append("Subdomain brand injection: Legitimate organization impersonated on foreign host")
 
-    # Deep URL Path & Query Phishing Vectors
-    path_keywords = ["validation", "verification", "confirm", "auth", "signin", "update-account", "webscr", "login", "logon"]
+    # 7. Deep URL Path & Query Authentication Vectors
+    path_keywords = [
+        "validation", "verification", "confirm", "auth", "signin",
+        "update-account", "webscr", "login", "logon", "pki-validation"
+    ]
     matched_path_kw = [pk for pk in path_keywords if pk in full_path]
     if matched_path_kw:
         score += 45
@@ -150,16 +186,16 @@ async def scan_url(url: str = Form(...)):
         score += 45
         signals.append("Obfuscated automated phishing kit token/hash located in URI path")
 
-    if len(clean_url) > 60:
+    if len(clean_url) > 90 and any(c in clean_url for c in ['?', '@', '%', '=']):
         score += 15
-        signals.append(f"Abnormal URI length ({len(clean_url)} chars) common in phishing redirects")
+        signals.append(f"Abnormally long parameterized URI ({len(clean_url)} chars) typical of phishing payloads")
 
     if raw_host.count(".") >= 3:
         score += 20
         signals.append(f"Deceptive subdomain nesting depth ({raw_host.count('.')} dots)")
 
     if re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', raw_host):
-        score += 40
+        score += 45
         signals.append("Direct bare IPv4 address routing detected (evading DNS inspection)")
 
     entropy = calculate_entropy(raw_host)
