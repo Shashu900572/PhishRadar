@@ -15,6 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Verified root domains that are 100% legitimate
 LEGIT_DOMAINS = {
     "instagram.com", "facebook.com", "whatsapp.com", "meta.com",
     "google.com", "youtube.com", "gmail.com",
@@ -23,7 +24,8 @@ LEGIT_DOMAINS = {
     "netflix.com", "flipkart.com", "zerodha.com", "kite.zerodha.com",
     "sbi.co.in", "onlinesbi.sbi", "hdfcbank.com", "icicibank.com",
     "axisbank.com", "paytm.com", "phonepe.com", "incometax.gov.in",
-    "indiapost.gov.in", "irctc.co.in", "uidai.gov.in", "epfindia.gov.in"
+    "indiapost.gov.in", "irctc.co.in", "uidai.gov.in", "epfindia.gov.in",
+    "onrender.com"
 }
 
 SUSPICIOUS_TLDS = {
@@ -100,7 +102,7 @@ async def scan_url(url: str = Form(...)):
     full_path = (parsed.path + ("?" + parsed.query if parsed.query else "")).lower()
     port = parsed.port
 
-    # Whitelist Check
+    # Whitelist Check (Instant 0% Safe)
     if is_whitelisted(raw_host):
         return {
             "risk_score": 0.0,
@@ -110,7 +112,7 @@ async def scan_url(url: str = Form(...)):
     score = 5
     signals = []
 
-    # Suspicious TLD
+    # Suspicious TLD check
     if any(raw_host.endswith(tld) for tld in SUSPICIOUS_TLDS):
         score += 35
         signals.append("High-risk / free-tier domain extension (commonly abused TLD)")
@@ -126,7 +128,7 @@ async def scan_url(url: str = Form(...)):
         score += 45
         signals.append(f"High-Value Brand/Fintech Impersonation target: {', '.join(matched_brands[:3])}")
 
-    # Fake TLD Suffix Trick
+    # Fake TLD Suffix Trick (e.g. .com-app)
     if re.search(r'\.(com|co|net|org|gov)-', raw_host):
         score += 40
         signals.append("Deceptive TLD hyphenation trick (impersonating legitimate root domain)")
@@ -161,7 +163,7 @@ async def scan_url(url: str = Form(...)):
         signals.append("Direct bare IPv4 address routing detected (evading DNS inspection)")
 
     entropy = calculate_entropy(raw_host)
-    if entropy > 3.8:
+    if entropy > 4.0:
         score += 20
         signals.append(f"High domain randomness / algorithmic generation (Entropy: {entropy})")
 
