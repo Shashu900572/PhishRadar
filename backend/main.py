@@ -1,6 +1,8 @@
 import math
 import re
 from urllib.parse import urlparse
+import httpx
+from bs4 import BeautifulSoup
 from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -104,6 +106,70 @@ def match_token(keyword: str, text: str) -> bool:
         return bool(re.search(pattern, text, re.IGNORECASE))
     return keyword.lower() in text.lower()
 
+async def perform_phase2_dom_scan(url: str, raw_host: str, current_score: float, signals: list):
+    """Phase 2 Deep Scan: Crawls live HTML DOM to evaluate Tier 2 features (Forms, IFrames, Link ratios)"""
+    if current_score >= 80.0 or current_score == 0.0:
+        return current_score, signals  # Fast exit if definitive
+
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PhishRadar/2.6"}
+        async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as client:
+            response = await client.get(url, headers=headers)
+            if response.status_code != 200:
+                return current_score, signals
+
+            html_content = response.text
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            # 1. Analyze Forms (Credential Harvester Check / SFH)
+            forms = soup.find_all('form')
+            for form in forms:
+                action = form.get('action', '').strip().lower()
+                if not action or action == '#' or action.startswith('javascript:'):
+                    current_score += 25
+                    signals.append("Suspicious form action handler (empty or client-side void)")
+                elif 'http' in action and raw_host not in action:
+                    current_score += 35
+                    signals.append("Server Form Handler (SFH) exploit: Form posts credentials to external third-party domain")
+
+            # 2. Check for IFrames (Overlay / Clickjacking / Cloaking)
+            iframes = soup.find_all('iframe')
+            if iframes:
+                current_score += 20
+                signals.append(f"Hidden iframe elements detected ({len(iframes)} iframe tags)")
+
+            # 3. Analyze Link Distribution
+            links = soup.find_all('a', href=True)
+            if links:
+                ext_links = 0
+                null_links = 0
+                for a in links:
+                    href = a['href'].strip().lower()
+                    if href == '#' or href.startswith('javascript:'):
+                        null_links += 1
+                    elif 'http' in href and raw_host not in href:
+                        ext_links += 1
+                
+                ext_ratio = ext_links / len(links)
+                if ext_ratio > 0.85:
+                    current_score += 20
+                    signals.append(f"Abnormal external link ratio ({round(ext_ratio * 100)}% of anchors point externally)")
+
+            # 4. Check Title Impersonation
+            title_tag = soup.find('title')
+            if title_tag:
+                title_text = title_tag.get_text().lower()
+                brand_triggers = ["login", "signin", "verify", "secure", "account", "update", "banking", "support"]
+                if any(bt in title_text for bt in brand_triggers) and not any(bh in raw_host for bh in title_text.split()):
+                    current_score += 25
+                    signals.append(f"Webpage title spoofing mismatch: Title declares '{title_tag.get_text().strip()}' on foreign domain")
+
+    except Exception:
+        # Timeout or network unreachable; skip DOM scan gracefully without failing request
+        pass
+
+    return min(current_score, 99.0), signals
+
 @app.post("/api/scan/url")
 async def scan_url(url: str = Form(...)):
     clean_url = url.strip()
@@ -161,7 +227,7 @@ async def scan_url(url: str = Form(...)):
         score += 45
         signals.append("Hosted on public free-tier / developer cloud domain commonly abused for credential theft")
 
-    # 5. Fake TLD Suffix Trick (e.g. .com-app)
+    # 5. Fake TLD Suffix Trick
     if re.search(r'\.(com|co|net|org|gov)-', raw_host):
         score += 40
         signals.append("Deceptive TLD hyphenation trick (impersonating legitimate root domain)")
@@ -210,6 +276,10 @@ async def scan_url(url: str = Form(...)):
     if raw_host.count("-") >= 2 or ("-" in raw_host and any(b in raw_host for b in impersonation_targets)):
         score += 20
         signals.append("Typosquatting hyphen separator paired with brand name")
+
+    # Execute Phase 2 DOM Deep Crawl if score falls into ambiguous zone (10% to 75%)
+    if 10 <= score <= 75:
+        score, signals = await perform_phase2_dom_scan(clean_url, raw_host, score, signals)
 
     if not signals:
         signals.append("Domain syntax normal, no lexical anomalies found")
