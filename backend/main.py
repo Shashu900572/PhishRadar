@@ -22,7 +22,7 @@ LEGIT_DOMAINS = {
     "twitter.com", "x.com", "github.com", "amazon.com", "amazon.in",
     "netflix.com", "flipkart.com", "zerodha.com", "kite.zerodha.com",
     "sbi.co.in", "onlinesbi.sbi", "hdfcbank.com", "icicibank.com",
-    "axisbank.com", "paytm.com", "phonepe.com"
+    "axisbank.com", "paytm.com", "phonepe.com", "incometax.gov.in"
 }
 
 def is_whitelisted(domain: str) -> bool:
@@ -34,17 +34,23 @@ def is_whitelisted(domain: str) -> bool:
 
 THREAT_KEYWORDS = {
     "urgency": [
-        "suspended", "urgent", "24 hours", "immediate", "blocked", "freeze", "arrest",
-        "तुरंत", "बंद", "अवरुद्ध", "24 घंटे", "गिरफ्तार", "चेतावनी", "turant", "band", "block", "giraftaar",
-        "ತಕ್ಷಣ", "ರದ್ದು", "ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ", "ಬಂಧನ", "ಎಚ್ಚರಿಕೆ", "takshana", "raddu", "bandhana"
+        "suspended", "urgent", "24 hours", "immediate", "immediately", "blocked", "freeze", "arrest",
+        "deactivated", "deactivate", "expired", "expire", "action required", "terminate", "disconnect",
+        "power cut", "cut off", "legal action", "penalty", "fine",
+        "तुरंत", "बंद", "अवरुद्ध", "24 घंटे", "गिरफ्तार", "चेतावनी", "काट दिया जाएगा", "turant", "band", "block", "giraftaar",
+        "ತಕ್ಷಣ", "ರದ್ದು", "ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ", "ಬಂಧನ", "ಎಚ್ಚರಿಕೆ", "ಕಡಿತ", "takshana", "raddu", "bandhana"
     ],
-    "credentials": [
+    "credentials_and_finance": [
         "otp", "pin", "cvv", "password", "bank manager", "customs officer", "cbi", "unauthorized",
-        "ओटीपी", "पिन", "पासवर्ड", "बैंक प्रबंधक", "अवैध",
-        "ಒಟಿಪಿ", "ಪಿನ್", "ಪಾಸ್‌ವರ್ಡ್", "ಅಧಿಕಾರಿ"
+        "kyc", "pan", "pan card", "aadhar", "aadhaar", "upi", "credit card", "debit card",
+        "refund", "lottery", "cashback", "reward", "prize", "electricity bill", "bijli", "challan",
+        "loan", "income tax", "subsidy", "apk",
+        "ओटीपी", "पिन", "पासवर्ड", "बैंक प्रबंधक", "अवैध", "केवाईसी", "लॉटरी", "रिफंड", "बिजली",
+        "ಒಟಿಪಿ", "ಪಿನ್", "ಪಾಸ್‌ವರ್ಡ್", "ಅಧಿಕಾರಿ", "ಕೆವೈಸಿ", "ಲಾಟರಿ", "ಮರುಪಾವತಿ", "ವಿದ್ಯುತ್"
     ],
     "contextual_account": [
-        "account", "खाता", "ಖಾತೆ"
+        "account", "bank", "wallet", "funds", "balance", "sim", "number", "profile",
+        "खाता", "ಖಾತೆ"
     ]
 }
 
@@ -85,7 +91,6 @@ async def scan_url(url: str = Form(...)):
     domain = (parsed.hostname or parsed.netloc.split(":")[0]).lower()
     port = parsed.port
 
-    # Whitelist bypass for verified legitimate root domains
     if is_whitelisted(domain):
         return {
             "risk_score": 0.0,
@@ -95,7 +100,10 @@ async def scan_url(url: str = Form(...)):
     score = 5
     signals = []
 
-    impersonation_targets = ["zerodha", "kite", "bank", "secure", "login", "instagram", "facebook", "sbi", "paytm"]
+    impersonation_targets = [
+        "zerodha", "kite", "bank", "secure", "login", "instagram", "facebook",
+        "sbi", "paytm", "upi", "hdfc", "icici", "kyc", "verify", "support", "bill"
+    ]
     if any(tok in domain for tok in impersonation_targets):
         score += 45
         signals.append("High-Value Brand/Fintech Impersonation token detected")
@@ -131,18 +139,30 @@ async def scan_text(content: str = Form(...)):
 
     found_urgency = [w for w in THREAT_KEYWORDS["urgency"] if match_token(w, text_lower)]
     if found_urgency:
-        score += 45
-        signals.append(f"Psychological urgency tokens identified: {', '.join(found_urgency[:4])}")
+        score += 40
+        signals.append(f"Psychological urgency tokens: {', '.join(found_urgency[:4])}")
 
-    found_creds = [w for w in THREAT_KEYWORDS["credentials"] if match_token(w, text_lower)]
+    found_creds = [w for w in THREAT_KEYWORDS["credentials_and_finance"] if match_token(w, text_lower)]
     if found_creds:
-        score += 48
-        signals.append(f"Credential harvest & impersonation triggers: {', '.join(found_creds[:4])}")
+        score += 40
+        signals.append(f"Financial / Credential / KYC targets: {', '.join(found_creds[:4])}")
 
     found_account = [w for w in THREAT_KEYWORDS["contextual_account"] if match_token(w, text_lower)]
-    if found_account and (found_urgency or found_creds):
-        score += 10
-        signals.append(f"Targeted account linkage: {', '.join(found_account)}")
+    if found_account:
+        score += 15
+        signals.append(f"Targeted asset/account linkage: {', '.join(found_account[:3])}")
+
+    # Detect links/URLs embedded in the message
+    detected_urls = re.findall(r'(?:https?:\/\/|www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?', content)
+    suspicious_links = []
+    for raw_u in detected_urls:
+        u_domain = raw_u.lower().replace("http://", "").replace("https://", "").split("/")[0]
+        if not is_whitelisted(u_domain) and any(ext in u_domain for ext in [".com", ".in", ".org", ".net", ".top", ".xyz", ".co", ".app"]):
+            suspicious_links.append(u_domain)
+
+    if suspicious_links:
+        score += 30
+        signals.append(f"Unverified redirect link detected: {', '.join(suspicious_links[:2])}")
 
     if not signals:
         signals.append("Safe message: No credential harvesting or coercive tokens identified")
