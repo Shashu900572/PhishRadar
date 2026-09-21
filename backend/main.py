@@ -15,6 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Verified root domains that are 100% legitimate
 LEGIT_DOMAINS = {
     "instagram.com", "facebook.com", "whatsapp.com", "meta.com",
     "google.com", "youtube.com", "gmail.com",
@@ -22,21 +23,21 @@ LEGIT_DOMAINS = {
     "twitter.com", "x.com", "github.com", "amazon.com", "amazon.in",
     "netflix.com", "flipkart.com", "zerodha.com", "kite.zerodha.com",
     "sbi.co.in", "onlinesbi.sbi", "hdfcbank.com", "icicibank.com",
-    "axisbank.com", "paytm.com", "phonepe.com", "incometax.gov.in"
+    "axisbank.com", "paytm.com", "phonepe.com", "incometax.gov.in",
+    "indiapost.gov.in", "irctc.co.in", "uidai.gov.in", "epfindia.gov.in"
 }
 
-def is_whitelisted(domain: str) -> bool:
-    domain = domain.lower()
-    for legit in LEGIT_DOMAINS:
-        if domain == legit or domain.endswith("." + legit):
-            return True
-    return False
+SUSPICIOUS_TLDS = {
+    ".xyz", ".top", ".tk", ".ml", ".ga", ".cf", ".gq", ".work", ".click",
+    ".loan", ".club", ".buzz", ".guru", ".vip", ".site", ".icu", ".cam"
+}
 
 THREAT_KEYWORDS = {
     "urgency": [
         "suspended", "urgent", "24 hours", "immediate", "immediately", "blocked", "freeze", "arrest",
         "deactivated", "deactivate", "expired", "expire", "action required", "terminate", "disconnect",
-        "power cut", "cut off", "legal action", "penalty", "fine",
+        "disconnected", "power cut", "cut off", "legal action", "penalty", "fine", "police", "court",
+        "last date", "final notice",
         "तुरंत", "बंद", "अवरुद्ध", "24 घंटे", "गिरफ्तार", "चेतावनी", "काट दिया जाएगा", "turant", "band", "block", "giraftaar",
         "ತಕ್ಷಣ", "ರದ್ದು", "ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ", "ಬಂಧನ", "ಎಚ್ಚರಿಕೆ", "ಕಡಿತ", "takshana", "raddu", "bandhana"
     ],
@@ -44,15 +45,23 @@ THREAT_KEYWORDS = {
         "otp", "pin", "cvv", "password", "bank manager", "customs officer", "cbi", "unauthorized",
         "kyc", "pan", "pan card", "aadhar", "aadhaar", "upi", "credit card", "debit card",
         "refund", "lottery", "cashback", "reward", "prize", "electricity bill", "bijli", "challan",
-        "loan", "income tax", "subsidy", "apk",
+        "loan", "income tax", "subsidy", "apk", "kbc", "delivery address", "customs duty", "bonus",
+        "part time job", "earn money", "daily income", "telegram",
         "ओटीपी", "पिन", "पासवर्ड", "बैंक प्रबंधक", "अवैध", "केवाईसी", "लॉटरी", "रिफंड", "बिजली",
         "ಒಟಿಪಿ", "ಪಿನ್", "ಪಾಸ್‌ವರ್ಡ್", "ಅಧಿಕಾರಿ", "ಕೆವೈಸಿ", "ಲಾಟರಿ", "ಮರುಪಾವತಿ", "ವಿದ್ಯುತ್"
     ],
     "contextual_account": [
-        "account", "bank", "wallet", "funds", "balance", "sim", "number", "profile",
+        "account", "bank", "wallet", "funds", "balance", "sim", "number", "profile", "parcel", "package",
         "खाता", "ಖಾತೆ"
     ]
 }
+
+def is_whitelisted(domain: str) -> bool:
+    domain = domain.lower().strip()
+    for legit in LEGIT_DOMAINS:
+        if domain == legit or domain.endswith("." + legit):
+            return True
+    return False
 
 def detect_language(text: str) -> str:
     if re.search(r'[\u0C80-\u0CFF]', text):
@@ -88,42 +97,60 @@ async def scan_url(url: str = Form(...)):
         clean_url = f"http://{clean_url}"
 
     parsed = urlparse(clean_url)
-    domain = (parsed.hostname or parsed.netloc.split(":")[0]).lower()
+    raw_host = (parsed.hostname or parsed.netloc.split(":")[0]).lower()
     port = parsed.port
 
-    if is_whitelisted(domain):
+    # 1. Whitelist Check (Instant Safe)
+    if is_whitelisted(raw_host):
         return {
             "risk_score": 0.0,
-            "signals": [f"Verified authentic root domain: {domain}"]
+            "signals": [f"Verified authentic root domain: {raw_host}"]
         }
 
     score = 5
     signals = []
 
+    # 2. Suspicious TLD check
+    if any(raw_host.endswith(tld) for tld in SUSPICIOUS_TLDS):
+        score += 35
+        signals.append("High-risk / free-tier domain extension (commonly abused TLD)")
+
+    # 3. Brand Impersonation / Subdomain deceptive nesting
     impersonation_targets = [
         "zerodha", "kite", "bank", "secure", "login", "instagram", "facebook",
-        "sbi", "paytm", "upi", "hdfc", "icici", "kyc", "verify", "support", "bill"
+        "sbi", "paytm", "upi", "hdfc", "icici", "kyc", "verify", "support", "bill",
+        "amazon", "google", "apple", "netflix", "flipkart", "post", "tax"
     ]
-    if any(tok in domain for tok in impersonation_targets):
+    matched_brands = [b for b in impersonation_targets if b in raw_host]
+    if matched_brands:
         score += 45
-        signals.append("High-Value Brand/Fintech Impersonation token detected")
+        signals.append(f"High-Value Brand/Fintech Impersonation token: {', '.join(matched_brands[:3])}")
 
-    entropy = calculate_entropy(domain)
+    # 4. Excessive Subdomain / Nesting deceptive trick
+    if raw_host.count(".") >= 3:
+        score += 20
+        signals.append(f"Deceptive subdomain nesting depth ({raw_host.count('.')} dots)")
+
+    # 5. Direct IP routing
+    if re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', raw_host):
+        score += 40
+        signals.append("Direct bare IPv4 address routing detected (evading DNS inspection)")
+
+    # 6. High Entropy (DGA randomly generated domains)
+    entropy = calculate_entropy(raw_host)
     if entropy > 3.8:
         score += 20
-        signals.append(f"High domain randomness (Entropy: {entropy})")
+        signals.append(f"High domain randomness / algorithmic generation (Entropy: {entropy})")
 
-    if domain.count(".") >= 3:
-        score += 15
-        signals.append(f"Excessive subdomain depth ({domain.count('.')} dots)")
-
-    if re.search(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', domain):
-        score += 30
-        signals.append("Direct bare IPv4 address routing detected")
-
+    # 7. Suspicious Ports
     if port and port not in [80, 443]:
-        score += 20
+        score += 25
         signals.append(f"Suspicious high-risk port detected: :{port}")
+
+    # 8. Deceptive Hyphen Chaining (e.g. sbi-online-banking-update.com)
+    if raw_host.count("-") >= 2:
+        score += 15
+        signals.append("Multiple hyphen separators typical of phishing typosquatting")
 
     if not signals:
         signals.append("Domain syntax normal, no lexical anomalies found")
@@ -145,24 +172,34 @@ async def scan_text(content: str = Form(...)):
     found_creds = [w for w in THREAT_KEYWORDS["credentials_and_finance"] if match_token(w, text_lower)]
     if found_creds:
         score += 40
-        signals.append(f"Financial / Credential / KYC targets: {', '.join(found_creds[:4])}")
+        signals.append(f"Financial / Credential / Scam triggers: {', '.join(found_creds[:4])}")
 
     found_account = [w for w in THREAT_KEYWORDS["contextual_account"] if match_token(w, text_lower)]
     if found_account:
         score += 15
-        signals.append(f"Targeted asset/account linkage: {', '.join(found_account[:3])}")
+        signals.append(f"Targeted asset/account context: {', '.join(found_account[:3])}")
 
-    # Detect links/URLs embedded in the message
+    # Check for embedded links/URLs in SMS
     detected_urls = re.findall(r'(?:https?:\/\/|www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?', content)
     suspicious_links = []
     for raw_u in detected_urls:
         u_domain = raw_u.lower().replace("http://", "").replace("https://", "").split("/")[0]
-        if not is_whitelisted(u_domain) and any(ext in u_domain for ext in [".com", ".in", ".org", ".net", ".top", ".xyz", ".co", ".app"]):
+        if not is_whitelisted(u_domain) and any(ext in u_domain for ext in [".com", ".in", ".org", ".net", ".top", ".xyz", ".co", ".app", ".info", ".me", ".live"]):
             suspicious_links.append(u_domain)
 
     if suspicious_links:
-        score += 30
-        signals.append(f"Unverified redirect link detected: {', '.join(suspicious_links[:2])}")
+        score += 35
+        signals.append(f"Unverified redirect link detected in SMS: {', '.join(suspicious_links[:2])}")
+
+    # Check for raw mobile numbers in scam SMS (calling scammer pretending to be support)
+    if re.search(r'\b(?:\+91|0)?[6-9]\d{9}\b', content) and (found_urgency or found_creds):
+        score += 20
+        signals.append("Direct unverified contact number embedded with urgent call-to-action")
+
+    # Check for malicious APK mentions
+    if ".apk" in text_lower or "download app" in text_lower:
+        score += 35
+        signals.append("External unauthorized Android application (.apk) installation prompt")
 
     if not signals:
         signals.append("Safe message: No credential harvesting or coercive tokens identified")
