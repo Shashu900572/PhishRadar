@@ -100,6 +100,7 @@ async def scan_url(url: str = Form(...)):
     path = parsed.path.lower()
     port = parsed.port
 
+    # Whitelist Check
     if is_whitelisted(raw_host):
         return {
             "risk_score": 0.0,
@@ -109,10 +110,12 @@ async def scan_url(url: str = Form(...)):
     score = 5
     signals = []
 
+    # Suspicious TLD
     if any(raw_host.endswith(tld) for tld in SUSPICIOUS_TLDS):
         score += 35
         signals.append("High-risk / free-tier domain extension (commonly abused TLD)")
 
+    # Brand Impersonation targets
     impersonation_targets = [
         "zerodha", "kite", "bank", "secure", "login", "instagram", "facebook",
         "sbi", "paytm", "upi", "hdfc", "icici", "kyc", "verify", "support", "bill",
@@ -123,6 +126,18 @@ async def scan_url(url: str = Form(...)):
         score += 45
         signals.append(f"High-Value Brand/Fintech Impersonation token: {', '.join(matched_brands[:3])}")
 
+    # Fake TLD Suffix Trick (e.g. .com-app or .com-login)
+    if re.search(r'\.(com|co|net|org|gov)-', raw_host):
+        score += 40
+        signals.append("Deceptive TLD hyphenation trick (impersonating legitimate root domain)")
+
+    # Subdomain brand spoofing (e.g. appleid.apple.com-app.es)
+    parts = raw_host.split(".")
+    if len(parts) >= 3 and any(b in ".".join(parts[:-2]) for b in impersonation_targets):
+        score += 35
+        signals.append("Subdomain brand injection: Legitimate organization impersonated on foreign host")
+
+    # Deep URL Path Phishing Vectors
     path_keywords = ["validation", "verification", "confirm", "auth", "signin", "update-account", "webscr", "login"]
     matched_path_kw = [pk for pk in path_keywords if pk in path]
     if matched_path_kw:
@@ -154,9 +169,9 @@ async def scan_url(url: str = Form(...)):
         score += 25
         signals.append(f"Suspicious high-risk port detected: :{port}")
 
-    if raw_host.count("-") >= 2:
-        score += 15
-        signals.append("Multiple hyphen separators typical of phishing typosquatting")
+    if raw_host.count("-") >= 2 or ("-" in raw_host and matched_brands):
+        score += 20
+        signals.append("Typosquatting hyphen separator paired with brand name")
 
     if not signals:
         signals.append("Domain syntax normal, no lexical anomalies found")
