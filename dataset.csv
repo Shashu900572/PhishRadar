@@ -30,7 +30,7 @@ http://115.169.132.148/microsoft/webscr,phishing,4.66,39,1,microsoft
 http://115.192.23.191/paypal/security-alert,phishing,4.25,43,1,paypal
 http://26.149.162.238/amazon/portal,phishing,3.9,35,1,amazon
 http://google-verify-login30.info/verify,phishing,4.26,40,0,google
-http://23.43.193.207/apple/auth,phishing,4.0,31,1,apple
+http://23.43.193.207/apple/auth,phishing,4,31,1,apple
 http://apple-verify-login32.net/portal,phishing,4.8,38,0,apple
 http://zerodha-verify-login33.com/auth,phishing,4.67,38,0,zerodha
 http://159.118.101.86/netflix/portal,phishing,4.71,36,1,netflix
@@ -84,7 +84,7 @@ http://170.181.105.142/google/verify,phishing,4.71,36,1,google
 http://google-verify-login82.com/verify,phishing,4.8,39,0,google
 http://14.94.109.109/hdfc/webscr,phishing,4.13,32,1,hdfc
 http://165.30.37.47/zerodha/verify,phishing,4.51,34,1,zerodha
-http://hdfc-verify-login85.net/portal,phishing,4.0,37,0,hdfc
+http://hdfc-verify-login85.net/portal,phishing,4,37,0,hdfc
 http://30.27.190.65/microsoft/portal,phishing,4.74,36,1,microsoft
 http://79.30.67.40/zerodha/webscr,phishing,4.44,33,1,zerodha
 http://netflix-verify-login88.net/security-alert,phishing,4.76,48,0,netflix
@@ -345,7 +345,7 @@ http://78.64.187.121/microsoft/verify,phishing,4.06,37,1,microsoft
 http://99.191.233.141/zerodha/security-alert,phishing,4.43,44,1,zerodha
 http://zerodha-verify-login344.info/verify,phishing,4.61,42,0,zerodha
 http://129.117.196.202/apple/auth,phishing,4.39,33,1,apple
-http://135.206.145.119/apple/webscr,phishing,4.0,35,1,apple
+http://135.206.145.119/apple/webscr,phishing,4,35,1,apple
 http://15.99.211.165/netflix/auth,phishing,4.31,33,1,netflix
 http://74.72.206.160/hdfc/verify,phishing,4.57,32,1,hdfc
 http://179.49.18.76/icici/account-update,phishing,3.82,40,1,icici
@@ -362,7 +362,7 @@ http://apple-verify-login359.tk/portal,phishing,4.02,38,0,apple
 http://179.63.226.217/sbi/login,phishing,4.79,31,1,sbi
 http://189.179.228.128/sbi/auth,phishing,3.81,31,1,sbi
 http://hdfc-verify-login362.com/webscr,phishing,3.8,38,0,hdfc
-http://23.59.219.175/zerodha/portal,phishing,4.0,35,1,zerodha
+http://23.59.219.175/zerodha/portal,phishing,4,35,1,zerodha
 http://google-verify-login364.org/portal,phishing,4.44,40,0,google
 http://netflix-verify-login365.in/verify,phishing,4.56,40,0,netflix
 http://116.142.254.69/netflix/portal,phishing,3.81,36,1,netflix
@@ -374,7 +374,7 @@ http://icici-verify-login371.com/webscr,phishing,4.19,39,0,icici
 http://paypal-verify-login372.co/verify,phishing,4.86,39,0,paypal
 http://paypal-verify-login373.org/auth,phishing,3.87,38,0,paypal
 http://netflix-verify-login374.tk/portal,phishing,3.85,40,0,netflix
-http://microsoft-verify-login375.net/login,phishing,4.0,42,0,microsoft
+http://microsoft-verify-login375.net/login,phishing,4,42,0,microsoft
 http://44.86.45.176/netflix/account-update,phishing,4.54,42,1,netflix
 http://paypal-verify-login377.net/account-update,phishing,4.75,48,0,paypal
 http://apple-verify-login378.info/verify,phishing,3.82,40,0,apple
@@ -512,7 +512,7 @@ http://sbi-verify-login509.org/webscr,phishing,3.98,37,0,sbi
 http://88.0.188.20/microsoft/login,phishing,4.11,34,1,microsoft
 http://15.219.179.202/zerodha/webscr,phishing,3.85,36,1,zerodha
 http://microsoft-verify-login512.co/account-update,phishing,4.44,50,0,microsoft
-http://zerodha-verify-login513.co/portal,phishing,4.0,40,0,zerodha
+http://zerodha-verify-login513.co/portal,phishing,4,40,0,zerodha
 http://49.167.19.143/microsoft/portal,phishing,3.92,37,1,microsoft
 http://zerodha-verify-login515.com/webscr,phishing,4.39,41,0,zerodha
 http://google-verify-login516.com/login,phishing,4.57,39,0,google
@@ -685,7 +685,7 @@ https://www.sbi.com/dashboard/portal/132,legitimate,3.13,40,0,sbi
 https://www.microsoft.com/dashboard/portal/133,legitimate,2.37,46,0,microsoft
 https://www.sbi.com/dashboard/portal/134,legitimate,3.16,40,0,sbi
 https://www.netflix.com/dashboard/portal/135,legitimate,2.5,44,0,netflix
-https://www.zerodha.com/dashboard/portal/136,legitimate,3.0,44,0,zerodha
+https://www.zerodha.com/dashboard/portal/136,legitimate,3,44,0,zerodha
 https://www.microsoft.com/dashboard/portal/137,legitimate,2.49,46,0,microsoft
 https://www.zerodha.com/dashboard/portal/138,legitimate,3.01,44,0,zerodha
 https://www.netflix.com/dashboard/portal/139,legitimate,3.19,44,0,netflix
@@ -744,7 +744,7 @@ https://www.netflix.com/dashboard/portal/191,legitimate,2.62,44,0,netflix
 https://www.zerodha.com/dashboard/portal/192,legitimate,3.04,44,0,zerodha
 https://www.hdfc.com/dashboard/portal/193,legitimate,2.83,41,0,hdfc
 https://www.google.com/dashboard/portal/194,legitimate,2.25,43,0,google
-https://www.google.com/dashboard/portal/195,legitimate,3.0,43,0,google
+https://www.google.com/dashboard/portal/195,legitimate,3,43,0,google
 https://www.icici.com/dashboard/portal/196,legitimate,2.37,42,0,icici
 https://www.sbi.com/dashboard/portal/197,legitimate,2.88,40,0,sbi
 https://www.paypal.com/dashboard/portal/198,legitimate,2.6,43,0,paypal
@@ -995,7 +995,7 @@ https://www.icici.com/dashboard/portal/442,legitimate,2.35,42,0,icici
 https://www.icici.com/dashboard/portal/443,legitimate,3.03,42,0,icici
 https://www.zerodha.com/dashboard/portal/444,legitimate,2.92,44,0,zerodha
 https://www.amazon.com/dashboard/portal/445,legitimate,3.03,43,0,amazon
-https://www.google.com/dashboard/portal/446,legitimate,3.0,43,0,google
+https://www.google.com/dashboard/portal/446,legitimate,3,43,0,google
 https://www.microsoft.com/dashboard/portal/447,legitimate,2.91,46,0,microsoft
 https://www.sbi.com/dashboard/portal/448,legitimate,2.79,40,0,sbi
 https://www.netflix.com/dashboard/portal/449,legitimate,2.75,44,0,netflix
@@ -1034,7 +1034,7 @@ https://www.amazon.com/dashboard/portal/481,legitimate,2.78,43,0,amazon
 https://www.icici.com/dashboard/portal/482,legitimate,2.96,42,0,icici
 https://www.sbi.com/dashboard/portal/483,legitimate,2.79,40,0,sbi
 https://www.apple.com/dashboard/portal/484,legitimate,2.28,42,0,apple
-https://www.apple.com/dashboard/portal/485,legitimate,3.0,42,0,apple
+https://www.apple.com/dashboard/portal/485,legitimate,3,42,0,apple
 https://www.amazon.com/dashboard/portal/486,legitimate,2.25,43,0,amazon
 https://www.icici.com/dashboard/portal/487,legitimate,2.33,42,0,icici
 https://www.zerodha.com/dashboard/portal/488,legitimate,2.2,44,0,zerodha
