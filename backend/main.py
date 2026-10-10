@@ -238,24 +238,18 @@ import os
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-# Absolute paths for local and Render environments
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # backend/
-ROOT_DIR = os.path.dirname(BASE_DIR)                 # project root/
-
-frontend_path = os.path.join(ROOT_DIR, "frontend")
-if not os.path.exists(frontend_path):
-    frontend_path = os.path.join(BASE_DIR, "frontend")
-
-# Mount static files safely
-app.mount("/static", StaticFiles(directory=frontend_path), name="static")
-
-# Direct fallback route to guarantee index.html loads at root URL
 import os
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 
-# Resolve the absolute path to the frontend folder next to backend/
+# Locate index.html explicitly
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "../frontend"))
+index_path = os.path.join(BASE_DIR, "../frontend/index.html")
+if not os.path.exists(index_path):
+    index_path = os.path.join(BASE_DIR, "frontend/index.html")
 
-# Mount the frontend directory directly at the root
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard():
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>Frontend index.html not found on server</h1>"
