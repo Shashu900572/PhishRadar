@@ -253,6 +253,7 @@ app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 @app.get("/")
 async def serve_index():
     index_file = os.path.join(frontend_path, "index.html")
+    print(f"LOOKING FOR INDEX AT: {index_file}, EXISTS: {os.path.exists(index_file)}")
     if os.path.exists(index_file):
         return FileResponse(index_file)
-    return {"error": "index.html not found", "path": index_file}
+    return {"error": "index.html not found", "path": index_file, "frontend_path": frontend_path}
