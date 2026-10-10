@@ -243,16 +243,16 @@ from fastapi.responses import HTMLResponse
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
-    # Look for index.html in standard locations whether run locally or on Render
-    paths = [
-        os.path.join(os.path.dirname(__file__), "../frontend/index.html"),
-        os.path.join(os.path.dirname(__file__), "frontend/index.html"),
-        os.path.abspath("frontend/index.html")
-    ]
-    
-    for path in paths:
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                return f.read()
-                
-    return "<h1>Frontend index.html not found</h1>"
+    # Check current working directory directly
+    path = "frontend/index.html"
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+            
+    # Fallback to absolute relative check
+    alt_path = os.path.join(os.path.dirname(__file__), "../frontend/index.html")
+    if os.path.exists(alt_path):
+        with open(alt_path, "r", encoding="utf-8") as f:
+            return f.read()
+            
+    return f"<h1>Looking in: {os.getcwd()} - index.html not found</h1>"
