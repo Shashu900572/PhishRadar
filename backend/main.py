@@ -250,10 +250,12 @@ if not os.path.exists(frontend_path):
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
 # Direct fallback route to guarantee index.html loads at root URL
-@app.get("/")
-async def serve_index():
-    index_file = os.path.join(frontend_path, "index.html")
-    print(f"LOOKING FOR INDEX AT: {index_file}, EXISTS: {os.path.exists(index_file)}")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return {"error": "index.html not found", "path": index_file, "frontend_path": frontend_path}
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Resolve the absolute path to the frontend folder next to backend/
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "../frontend"))
+
+# Mount the frontend directory directly at the root
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
