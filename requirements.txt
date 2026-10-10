@@ -1,7 +1,6 @@
 fastapi
-uvicorn
+uvicorn[standard]
+pydantic
+httpx
+beautifulsoup4
 python-multipart
-opencv-python-headless
-pillow
-pyzbar
-numpy
