@@ -234,4 +234,16 @@ frontend_path = os.path.join(ROOT_DIR, "frontend")
 if not os.path.exists(frontend_path):
     frontend_path = os.path.join(BASE_DIR, "frontend")
 
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Absolute bulletproof path for Render root execution & local execution
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # points to backend/
+ROOT_DIR = os.path.dirname(BASE_DIR)                 # points to root/
+
+# Try root/frontend first (Render standard), then backend/frontend as fallback
+frontend_path = os.path.join(ROOT_DIR, "frontend")
+if not os.path.exists(frontend_path):
+    frontend_path = os.path.join(BASE_DIR, "frontend")
+
 app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
