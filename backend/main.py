@@ -222,5 +222,16 @@ import os
 # --- Robust Static Files Mount for Render & Local ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+import os
+from fastapi.staticfiles import StaticFiles
 
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+# Explicitly find the frontend folder whether running locally or on Render
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+
+# Check both possible locations
+frontend_path = os.path.join(ROOT_DIR, "frontend")
+if not os.path.exists(frontend_path):
+    frontend_path = os.path.join(BASE_DIR, "frontend")
+
+app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
