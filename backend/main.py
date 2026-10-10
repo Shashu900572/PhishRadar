@@ -235,15 +235,24 @@ if not os.path.exists(frontend_path):
     frontend_path = os.path.join(BASE_DIR, "frontend")
 
 import os
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-# Absolute bulletproof path for Render root execution & local execution
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # points to backend/
-ROOT_DIR = os.path.dirname(BASE_DIR)                 # points to root/
+# Absolute paths for local and Render environments
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # backend/
+ROOT_DIR = os.path.dirname(BASE_DIR)                 # project root/
 
-# Try root/frontend first (Render standard), then backend/frontend as fallback
 frontend_path = os.path.join(ROOT_DIR, "frontend")
 if not os.path.exists(frontend_path):
     frontend_path = os.path.join(BASE_DIR, "frontend")
 
-app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+# Mount static files safely
+app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+# Direct fallback route to guarantee index.html loads at root URL
+@app.get("/")
+async def serve_index():
+    index_file = os.path.join(frontend_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"error": "index.html not found", "path": index_file}
