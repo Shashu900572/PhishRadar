@@ -241,8 +241,23 @@ from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.responses import HTMLResponse
 
-print(">>> CRITICAL DEBUG: main.py is loaded and executing! <<<")
+import os
+from fastapi.responses import HTMLResponse
 
-@app.get("/")
-async def root():
-    return {"status": "ACTIVE_AND_WORKING"}
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard():
+    # Absolute path to index.html from backend/main.py
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base_dir, "../frontend/index.html")
+    
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+            
+    # Fallback absolute path check
+    alt_path = os.path.abspath("frontend/index.html")
+    if os.path.exists(alt_path):
+        with open(alt_path, "r", encoding="utf-8") as f:
+            return f.read()
+            
+    return f"<h1>Dashboard template missing. Checked: {path} and {alt_path}</h1>"
