@@ -241,6 +241,8 @@ from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.responses import HTMLResponse
 
+print(">>> CRITICAL DEBUG: main.py is loaded and executing! <<<")
+
 @app.get("/")
 async def root():
-    return {"message": "PhishRadar API is live and working!"}
+    return {"status": "ACTIVE_AND_WORKING"}
