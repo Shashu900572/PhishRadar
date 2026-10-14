@@ -241,22 +241,6 @@ from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.responses import HTMLResponse
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_dashboard():
-    # Base directory of the current file (backend/main.py)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Check all possible relative layouts between backend/ and frontend/
-    possible_paths = [
-        os.path.join(current_dir, "../frontend/index.html"),  # If running from backend/ folder
-        os.path.join(current_dir, "frontend/index.html"),      # If running from root folder
-        os.path.abspath("frontend/index.html"),                # Absolute root check
-        os.path.abspath("../frontend/index.html")              # Absolute parent check
-    ]
-    
-    for path in possible_paths:
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                return f.read()
-                
-    return f"<h1>Error: index.html not found. Checked: {possible_paths}</h1>"
+@app.get("/")
+async def root():
+    return {"message": "PhishRadar API is live and working!"}
