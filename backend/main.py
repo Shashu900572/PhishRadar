@@ -243,16 +243,20 @@ from fastapi.responses import HTMLResponse
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
-    # Check current working directory directly
-    path = "frontend/index.html"
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-            
-    # Fallback to absolute relative check
-    alt_path = os.path.join(os.path.dirname(__file__), "../frontend/index.html")
-    if os.path.exists(alt_path):
-        with open(alt_path, "r", encoding="utf-8") as f:
-            return f.read()
-            
-    return f"<h1>Looking in: {os.getcwd()} - index.html not found</h1>"
+    # Base directory of the current file (backend/main.py)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Check all possible relative layouts between backend/ and frontend/
+    possible_paths = [
+        os.path.join(current_dir, "../frontend/index.html"),  # If running from backend/ folder
+        os.path.join(current_dir, "frontend/index.html"),      # If running from root folder
+        os.path.abspath("frontend/index.html"),                # Absolute root check
+        os.path.abspath("../frontend/index.html")              # Absolute parent check
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+                
+    return f"<h1>Error: index.html not found. Checked: {possible_paths}</h1>"
