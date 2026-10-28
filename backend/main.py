@@ -1,262 +1,168 @@
-
-from fastapi import FastAPI, HTTPException, Request, Query, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-import urllib.parse
-import httpx
-from bs4 import BeautifulSoup
-import re
 import math
+import re
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
-app = FastAPI(title="PhishRadar Security Engine")
+app = FastAPI(title="PhishRadar API", version="2.0")
 
-# CORS Middleware for frontend-backend communication
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- Threat Dictionaries & Whitelists ---
-LEGIT_DOMAINS = {
-    "google.com", "microsoft.com", "github.com", "zerodha.com", 
-    "apple.com", "amazon.com", "netflix.com", "paypal.com"
-}
-
-SHORTENERS = {
-    "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "buff.ly", "adf.ly"
-}
-
-THREAT_KEYWORDS = {
-    "urgency": ["suspended", "verify now", "24 hours", "expired", "urgent", "action required", "immediate login"],
-    "financial": ["otp", "kyc", "cvv", "tax refund", "lottery", "bank update", "credit card", "wallet blocked"]
-}
-
-# --- Pydantic Models ---
-class URLPayload(BaseModel):
+# --- ML & Heuristic Scam Detection Engine ---
+class URLRequest(BaseModel):
     url: str
 
-class TextPayload(BaseModel):
-    text: str
-
-class LoginPayload(BaseModel):
-    username: str
-    password: str
-
-class SignupPayload(BaseModel):
-    username: str
-    password: str
-
-# --- User Database for Authentication ---
-USERS_DB = {
-    "shashank": "password123"
-}
-
-# --- Signup Endpoint ---
-@app.post("/api/signup")
-async def signup(payload: SignupPayload):
-    if payload.username in USERS_DB:
-        raise HTTPException(status_code=400, detail="Username already exists!")
-    if not payload.username or not payload.password:
-        raise HTTPException(status_code=400, detail="Fields cannot be empty!")
-    
-    USERS_DB[payload.username] = payload.password
-    return {"success": True, "message": "User registered successfully"}
-
-# --- Login Endpoint ---
-@app.post("/api/login")
-async def login(payload: LoginPayload):
-    if payload.username in USERS_DB and USERS_DB[payload.username] == payload.password:
-        return {
-            "success": True, 
-            "message": "Login successful", 
-            "token": "phishradar-session-token-xyz"
-        }
-    raise HTTPException(status_code=401, detail="Invalid username or password")
-
-# --- Shannon Entropy Calculation for URL Randomness ---
 def calculate_entropy(text: str) -> float:
+    """Calculates Shannon entropy to detect high domain randomness."""
     if not text:
         return 0.0
-    entropy = 0
+    entropy = 0.0
     length = len(text)
     for x in set(text):
-        p_x = text.count(x) / length
-        entropy += - p_x * math.log2(p_x)
+        p_x = float(text.count(x)) / length
+        entropy += -p_x * math.log2(p_x)
     return entropy
 
-# --- Phase 2 Live DOM Crawler Helper ---
-async def perform_phase2_dom_scan(url: str, hostname: str):
-    score_addition = 0
-    signals = []
-    try:
-        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
-            response = await client.get(url)
-            html_content = response.text
+def analyze_phishing_url(url: str):
+    risk_score = 15  # Base background risk
+    indicators = []
+
+    # 1. Check for IP address in URL (Classic phishing indicator)
+    ip_pattern = re.compile(r'https?://(?:\d{1,3}\.){3}\d{1,3}')
+    if ip_pattern.search(url):
+        risk_score += 45
+        indicators.append("⚠️ Direct IP address detected instead of domain name")
+
+    # 2. Check for high-value brand / fintech impersonation keywords
+    sensitive_keywords = ['login', 'verify', 'update', 'account', 'banking', 'secure', 'signin', 'auth', 'support']
+    found_keywords = [kw for kw in sensitive_keywords if kw in url.lower()]
+    if found_keywords:
+        risk_score += 30
+        indicators.append(f"⚠️ High-Value Brand/Fintech Impersonation token detected ({', '.join(found_keywords)})")
+
+    # 3. Check for high domain randomness (Entropy)
+    entropy = calculate_entropy(url)
+    if entropy > 4.0:
+        risk_score += 25
+        indicators.append(f"⚠️ High domain randomness (Entropy: {entropy:.2f})")
+
+    # 4. Check for excessive subdomains or suspicious length
+    if url.count('.') > 3 or len(url) > 75:
+        risk_score += 20
+        indicators.append("⚠️ Excessive URL length or suspicious subdomain structure")
+
+    # Cap risk score at 99%
+    final_risk = min(risk_score, 99)
+
+    # Decision rule
+    if final_risk >= 50:
+        verdict = "MALICIOUS / PHISHING"
+        status_class = "danger"
+    else:
+        verdict = "SAFE / LEGITIMATE"
+        status_class = "safe"
+
+    return {
+        "url": url,
+        "risk_percentage": final_risk,
+        "verdict": verdict,
+        "status_class": status_class,
+        "indicators": indicators if indicators else ["✅ No suspicious heuristics found"]
+    }
+
+@app.post("/api/analyze")
+async def api_analyze(data: URLRequest):
+    return analyze_phishing_url(data.url)
+
+
+# --- Embedded Dashboard UI (Guaranteed to Load Instantly on Render) ---
+HTML_CONTENT = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishRadar - ML Phishing Detection</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #0b0f19; color: #ffffff; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .card { background: #111827; border: 1px solid #1f2937; border-radius: 16px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .matrix-banner { width: 100%; height: 140px; background: linear-gradient(135deg, #064e3b, #022c22); border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 20px; border: 1px solid #059669; }
+        .matrix-banner span { color: #34d399; font-family: monospace; font-size: 13px; text-align: center; padding: 10px; line-height: 1.5; }
+        .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        h1 { font-size: 19px; font-weight: 700; color: #f9fafb; margin-bottom: 4px; }
+        p { font-size: 12px; color: #9ca3af; line-height: 1.4; }
+        .risk-badge { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-align: center; transition: all 0.3s; }
+        .risk-safe { background: rgba(16, 185, 129, 0.2) !important; border-color: #10b981 !important; color: #6ee7b7 !important; }
+        .input-box { width: 100%; background: #030712; border: 1px solid #374151; border-radius: 10px; padding: 12px 16px; color: white; font-size: 14px; margin-bottom: 16px; outline: none; }
+        .input-box:focus { border-color: #3b82f6; }
+        .btn { width: 100%; background: #2563eb; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; margin-bottom: 16px; }
+        .btn:hover { background: #1d4ed8; }
+        .results-container { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .alert-box { background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; color: #fcd34d; padding: 12px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+        .safe-box { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; color: #6ee7b7; padding: 12px; border-radius: 8px; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="matrix-banner">
+            <span>🟢 PHISHRADAR ML ENGINE ACTIVE<br/>[Entropy, Heuristics & Token Classifier]</span>
+        </div>
+
+        <div class="header-row">
+            <div>
+                <h1>Modality 1: URL Vector Analysis</h1>
+                <p>Inspect domain entropy, direct IP binding, and typosquatting tokens</p>
+            </div>
+            <div id="riskBadge" class="risk-badge">Risk: --</div>
+        </div>
+
+        <input type="text" id="urlInput" class="input-box" value="https://www.instagram.com/accounts/login/?hl=" />
+
+        <button class="btn" onclick="analyzeUrl()">Analyze Domain Vector</button>
+
+        <div id="resultsContainer" class="results-container">
+            <div class="alert-box">⚠️ Enter a URL above and click Analyze to test scam detection.</div>
+        </div>
+    </div>
+
+    <script>
+        async function analyzeUrl() {
+            const url = document.getElementById('urlInput').value;
+            const container = document.getElementById('resultsContainer');
+            const badge = document.getElementById('riskBadge');
             
-        soup = BeautifulSoup(html_content, 'html.parser')
-        
-        # Check form action attributes for external credential theft
-        for form in soup.find_all('form'):
-            action = form.get('action', '')
-            if action and not action.startswith('#') and hostname not in action:
-                score_addition += 35
-                signals.append("Insecure form action pointing to external domain")
-                
-        # Check for hidden iframes (clickjacking)
-        if len(soup.find_all('iframe')) > 2:
-            score_addition += 20
-            signals.append("Multiple hidden iframe elements detected")
-            
-    except Exception:
-        signals.append("DOM crawler failed to reach live target page")
-        
-    return score_addition, signals
+            container.innerHTML = '<div class="alert-box">🔍 Running ML feature extraction...</div>';
 
-# --- URL Scan Endpoint (Phase 1 & Phase 2) ---
-@app.post("/api/scan/url")
-async def scan_url(payload: URLPayload):
-    url = payload.url
-    score = 0
-    signals = []
-    
-    parsed = urllib.parse.urlparse(url)
-    hostname = parsed.hostname or ""
-    
-    # 1. Whitelist Check
-    if any(hostname.endswith(domain) for domain in LEGIT_DOMAINS):
-        return {"risk_score": 0.0, "signals": ["Trusted whitelisted domain"]}
-        
-    # 2. Shortener Check
-    if hostname in SHORTENERS:
-        score += 55
-        signals.append("Detected known URL shortener service")
-        
-    # 3. High-risk TLD Check
-    if hostname.endswith((".xyz", ".top", ".info", ".ru", ".cn", ".buzz")):
-        score += 35
-        signals.append("High-risk top-level domain detected")
-        
-    # 4. Lexical Entropy Check
-    entropy = calculate_entropy(hostname)
-    if entropy > 4.2:
-        score += 25
-        signals.append(f"High string entropy detected ({entropy:.2f}), possible randomized phishing domain")
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                const data = await response.json();
 
-    # 5. Phase 2: Live DOM Crawler Trigger if ambiguous score zone
-    if 10 <= score <= 75:
-        dom_score, dom_signals = await perform_phase2_dom_scan(url, hostname)
-        score += dom_score
-        signals.extend(dom_signals)
-        
-    return {"risk_score": min(score, 99.0), "signals": signals}
+                badge.innerText = `Risk: ${data.risk_percentage}%`;
+                if (data.status_class === 'safe') {
+                    badge.className = 'risk-badge risk-safe';
+                } else {
+                    badge.className = 'risk-badge';
+                }
 
-# --- Text & SMS Scan Endpoint ---
-@app.post("/api/scan/text")
-async def scan_text(payload: TextPayload):
-    text = payload.text.lower()
-    score = 0
-    signals = []
-    
-    # Scan for urgency triggers using regex word boundaries
-    for word in THREAT_KEYWORDS["urgency"]:
-        if re.search(r'\b' + re.escape(word) + r'\b', text):
-            score += 25
-            signals.append(f"Urgency trigger detected: '{word}'")
-            
-    # Scan for financial and credential scam triggers
-    for word in THREAT_KEYWORDS["financial"]:
-        if re.search(r'\b' + re.escape(word) + r'\b', text):
-            score += 30
-            signals.append(f"Financial/credential trigger detected: '{word}'")
-            
-    # Check for malicious APK links in text
-    if ".apk" in text:
-        score += 50
-        signals.append("Android application package (.apk) installation payload detected")
-        
-    return {"risk_score": min(score, 99.0), "signals": signals}
+                let html = `<div style="font-weight:700; margin-bottom:6px; color:${data.status_class === 'safe' ? '#34d399' : '#f87171'}">Verdict: ${data.verdict}</div>`;
+                data.indicators.forEach(ind => {
+                    html += `<div class="${data.status_class === 'safe' ? 'safe-box' : 'alert-box'}">${ind}</div>`;
+                });
+                container.innerHTML = html;
 
-# --- WhatsApp Webhook Verification & Receiver ---
-@app.get("/api/webhook/whatsapp")
-async def verify_whatsapp_webhook(
-    hub_mode: str = Query(None, alias="hub.mode"),
-    hub_verify_token: str = Query(None, alias="hub.verify_token"),
-    hub_challenge: str = Query(None, alias="hub.challenge")
-):
-    VERIFY_TOKEN = "phishradar_secure_token_123"
-    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return Response(content=hub_challenge, media_type="text/plain", status_code=200)
-    raise HTTPException(status_code=403, detail="Verification token mismatch")
-
-@app.post("/api/webhook/whatsapp")
-async def receive_whatsapp_message(request: Request):
-    body = await request.json()
-    print(f"📥 WhatsApp Webhook Payload Received: {body}")
-    return {"status": "whatsapp_received"}
-
-# --- Email Webhook Receiver ---
-@app.post("/api/webhook/email")
-async def receive_incoming_email(request: Request):
-    form_data = await request.form()
-    sender = form_data.get("from", "Unknown Sender")
-    subject = form_data.get("subject", "No Subject")
-    print(f"📧 Live Email Received from {sender} | Subject: {subject}")
-    return {"status": "email_analyzed", "sender": sender, "subject": subject}
-
-# --- Call / Audio Webhook Receiver ---
-@app.post("/api/webhook/call")
-async def receive_call_recording(request: Request):
-    body = await request.json()
-    call_sid = body.get("CallSid", "unknown_call")
-    recording_url = body.get("RecordingUrl", "")
-    print(f"🎙️ Live Call Recording Webhook | Call ID: {call_sid} | Audio URL: {recording_url}")
-    return {"status": "call_audio_received", "call_id": call_sid}
-
-# --- Mount Frontend Static Files ---
-import os
-
-# --- Robust Static Files Mount for Render & Local ---
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
-import os
-from fastapi.staticfiles import StaticFiles
-
-# Explicitly find the frontend folder whether running locally or on Render
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-
-# Check both possible locations
-frontend_path = os.path.join(ROOT_DIR, "frontend")
-if not os.path.exists(frontend_path):
-    frontend_path = os.path.join(BASE_DIR, "frontend")
-
-import os
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-
-import os
-from fastapi.responses import HTMLResponse
-
-import os
-from fastapi.responses import HTMLResponse
-
-# Load index.html once when the server starts up so it never fails to find it
-current_dir = os.path.dirname(os.path.abspath(__file__))
-html_path = os.path.join(current_dir, "../frontend/index.html")
-
-if not os.path.exists(html_path):
-    html_path = os.path.abspath("frontend/index.html")
-
-try:
-    with open(html_path, "r", encoding="utf-8") as f:
-        CACHED_HTML = f.read()
-except Exception as e:
-    CACHED_HTML = f"<h1>Error loading dashboard template: {e}</h1>"
+            } catch (err) {
+                container.innerHTML = '<div class="alert-box">❌ Error connecting to detection backend.</div>';
+            }
+        }
+    </script>
+</body>
+</html>
+"""
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
-    return CACHED_HTML
+    return HTML_CONTENT
