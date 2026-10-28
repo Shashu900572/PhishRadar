@@ -244,20 +244,19 @@ from fastapi.responses import HTMLResponse
 import os
 from fastapi.responses import HTMLResponse
 
+# Load index.html once when the server starts up so it never fails to find it
+current_dir = os.path.dirname(os.path.abspath(__file__))
+html_path = os.path.join(current_dir, "../frontend/index.html")
+
+if not os.path.exists(html_path):
+    html_path = os.path.abspath("frontend/index.html")
+
+try:
+    with open(html_path, "r", encoding="utf-8") as f:
+        CACHED_HTML = f.read()
+except Exception as e:
+    CACHED_HTML = f"<h1>Error loading dashboard template: {e}</h1>"
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
-    # Absolute path to index.html from backend/main.py
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(base_dir, "../frontend/index.html")
-    
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-            
-    # Fallback absolute path check
-    alt_path = os.path.abspath("frontend/index.html")
-    if os.path.exists(alt_path):
-        with open(alt_path, "r", encoding="utf-8") as f:
-            return f.read()
-            
-    return f"<h1>Dashboard template missing. Checked: {path} and {alt_path}</h1>"
+    return CACHED_HTML
